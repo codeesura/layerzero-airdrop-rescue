@@ -42,7 +42,7 @@ The LayerZero Airdrop Rescue Tool is a specialized Rust-based solution designed 
 
 2. Clone the repository:
    ```
-   git clone https://github.com/yourusername/layerzero-airdrop-rescue.git
+   git clone https://github.com/codeesura/layerzero-airdrop-rescue.git
    ```
 
 3. Navigate to the project directory:

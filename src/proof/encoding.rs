@@ -7,10 +7,26 @@ use alloy::{
 };
 use eyre::{eyre, Result};
 use std::str::FromStr;
+use reqwest;
+use serde_json::Value;
 
 sol! {
     #[derive(Debug, PartialEq, Eq)]
     function encodeData(uint256 donationInWei, uint256 amountInWei, address safeWalletAddress, bytes32[] proof) external;
+}
+
+pub async fn get_eth_price() -> Result<u64> {
+    let url = "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT";
+    let response = reqwest::get(url).await?.text().await?;
+    let v: Value = serde_json::from_str(&response)?;
+    
+    let price_str = v["price"].as_str()
+        .ok_or_else(|| eyre!("Failed to extract price from JSON"))?;
+    
+        let price_f64 = price_str.parse::<f64>()?;
+        let price_u64 = price_f64.floor() as u64;
+        
+        Ok(price_u64)
 }
 
 pub async fn encode_data(
@@ -23,7 +39,13 @@ pub async fn encode_data(
 
     let proof = parse_proof(&proof_data.proof)?;
     let amount_in_wei = U256::from_str(&proof_data.amount)?;
-    let donation_in_wei = amount_in_wei / U256::from(35500);
+    let eth_price = get_eth_price().await
+        .map_err(|e| eyre!("Error fetching eth price: {:?}", e))?;
+
+    // calculate the divisor (eth price + 5% increase) * 10
+    let eth_price_with_margin = (eth_price * 105 / 100) * 10;
+    let divisor = U256::from(eth_price_with_margin);
+    let donation_in_wei = amount_in_wei / divisor;
 
     let encoded = create_encoded_data(donation_in_wei, amount_in_wei, safe_wallet_address, &proof)?;
     let modified_encoded = modify_encoded_data(encoded, proof.len(), amount_in_wei)?;
